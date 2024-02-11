@@ -1,10 +1,12 @@
-// Import necessary modules
 const express = require("express");
 const mongoose = require("mongoose");
+require("dotenv").config();
 
-// Connect to MongoDB
+const dbUser = process.env.DB_USER;
+const dbPass = process.env.DB_PASS;
+
 mongoose.connect(
-    "mongodb+srv://chocoisme:zxfzxAoyqmwyIX09@patientportaldata.uu1v0ci.mongodb.net/?retryWrites=true&w=majority"
+    `mongodb+srv://${dbUser}:${dbPass}@patientportaldata.uu1v0ci.mongodb.net/?retryWrites=true&w=majority`
 );
 
 // Define User Schema
