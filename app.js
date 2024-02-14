@@ -8,6 +8,7 @@ require("dotenv").config();
 
 const dbUser = process.env.DB_USER;
 const dbPass = process.env.DB_PASS;
+const adminPassword = process.env.ADMIN_PASSWORD;
 
 // Define User Schema
 const UserSchema = new mongoose.Schema({
@@ -66,14 +67,74 @@ const adminRole = new Role({
     ],
 });
 
-Role.find({}).then((roles) => {
+const adminUser = new User({
+    username: "Admin",
+    password: "", // We'll set this later
+    role: adminRole._id,
+});
+
+// Use an IIFE (Immediately Invoked Function Expression) to use async/await at the top level
+(async function () {
+    // Check if admin user already exists
+    const existingAdmin = await User.findOne({ username: "Admin" });
+
+    if (!existingAdmin) {
+        adminUser.password = await bcrypt.hash(adminPassword, 10);
+        try {
+            await adminUser.save();
+            console.log("Admin user saved successfully!");
+        } catch (err) {
+            console.error(err);
+        }
+    } else {
+        console.log("Admin user already exists.");
+    }
+})();
+
+Role.find({}).then(async (roles) => {
+    // Add async here
     if (roles.length === 0) {
-        doctorRole.save();
-        nurseRole.save();
-        patientRole.save();
-        adminRole.save();
+        // If no roles exist, create them
+        await Promise.all([
+            doctorRole.save(),
+            nurseRole.save(),
+            patientRole.save(),
+            adminRole.save(),
+        ]); // Add await here
+    } else {
+        // If roles exist, check each one for updates
+        for (let role of roles) {
+            let updatedRole;
+            switch (role.name) {
+                case "Doctor":
+                    updatedRole = doctorRole;
+                    break;
+                case "Nurse":
+                    updatedRole = nurseRole;
+                    break;
+                case "Patient":
+                    updatedRole = patientRole;
+                    break;
+                case "Administrator":
+                    updatedRole = adminRole;
+                    break;
+            }
+            // If the permissions don't match, update the role
+            if (!arraysEqual(role.permissions, updatedRole.permissions)) {
+                await Role.updateOne(
+                    // Add await here
+                    { _id: role._id },
+                    { $set: { permissions: updatedRole.permissions } }
+                );
+            }
+        }
     }
 });
+
+// Helper function to check if two arrays are equal
+function arraysEqual(a, b) {
+    return a.sort().toString() === b.sort().toString();
+}
 
 // Update the User Schema to include role
 UserSchema.add({ role: { type: mongoose.Schema.Types.ObjectId, ref: "Role" } });
@@ -159,33 +220,29 @@ patientRouter.post("/login", async (req, res) => {
 patientRouter.post(
     "/appointments",
     requireRole("book_appointment"),
-    async (req, res) => {
-        try {
-            // ... route logic ...
-        } catch (error) {
-            res.status(500).send(error.message);
-        }
+    (req, res) => {
+        res.send("Book an appointment");
     }
 );
 patientRouter.post(
     "/request-doctor",
     requireRole("request_doctor"),
     (req, res) => {
-        // ... route logic ...
+        res.send("Request a doctor");
     }
 );
 patientRouter.get(
     "/consultations",
     requireRole("view_consultation"),
     (req, res) => {
-        // ... route logic ...
+        res.send("View consultations");
     }
 );
 patientRouter.get(
     "/prescriptions",
     requireRole("view_prescription"),
     (req, res) => {
-        // ... route logic ...
+        res.send("View prescriptions");
     }
 );
 router.use("/api/patient", patientRouter);
@@ -196,28 +253,28 @@ doctorRouter.get(
     "/consultations",
     requireRole("conduct_consultation"),
     (req, res) => {
-        // ... route logic ...
+        res.send("Conduct consultations");
     }
 );
 doctorRouter.post(
     "/prescriptions",
     requireRole("prescribe_medication"),
     (req, res) => {
-        // ... route logic ...
+        res.send("Prescribe medications");
     }
 );
 doctorRouter.get(
     "/appointments",
     requireRole("view_appointments"),
     (req, res) => {
-        // ... route logic ...
+        res.send("View appointments");
     }
 );
 doctorRouter.put(
     "/medical-records",
     requireRole("update_medical_records"),
     (req, res) => {
-        // ... route logic ...
+        res.send("Update medical records");
     }
 );
 router.use("/api/doctor", doctorRouter);
@@ -228,63 +285,149 @@ nurseRouter.get(
     "/appointments",
     requireRole("manage_appointments"),
     (req, res) => {
-        // ... route logic ...
+        res.send("Manage appointments");
     }
 );
 nurseRouter.post(
     "/follow-ups",
     requireRole("patient_follow_up"),
     (req, res) => {
-        // ... route logic ...
+        res.send("Patient follow-ups");
     }
 );
 router.use("/api/nurse", nurseRouter);
 
-// Administrator Router
+// Admin Router
 const adminRouter = express.Router();
-adminRouter.get("/users", requireRole("manage_users"), (req, res) => {
-    try {
-        // ... route logic ...
-    } catch (error) {
-        res.status(500).send(error.message);
-    }
+
+// Get all users
+adminRouter.get("/users", requireRole("manage_users"), async (req, res) => {
+    const users = await User.find().populate("role");
+    res.json(users);
 });
+
+// Create a new user
 adminRouter.post("/users", requireRole("manage_users"), async (req, res) => {
     try {
-        // ... route logic ...
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(req.body.password, 10);
+
+        // Create a new user
+        const newUser = new User({
+            username: req.body.username,
+            password: hashedPassword,
+            role: req.body.role,
+        });
+
+        // Save the new user
+        await newUser.save();
+
+        res.json(newUser);
     } catch (error) {
         res.status(500).send(error.message);
     }
 });
+
+// Update a user
 adminRouter.put("/users", requireRole("manage_users"), async (req, res) => {
     try {
-        // ... route logic ...
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(req.body.password, 10);
+
+        // Update the user
+        const updatedUser = await User.findByIdAndUpdate(
+            req.body._id,
+            {
+                username: req.body.username,
+                password: hashedPassword,
+                role: req.body.role,
+            },
+            { new: true }
+        );
+
+        res.json(updatedUser);
     } catch (error) {
         res.status(500).send(error.message);
     }
 });
+
+// Delete a user
 adminRouter.delete("/users", requireRole("manage_users"), async (req, res) => {
     try {
-        // ... route logic ...
+        // Delete the user
+        await User.findByIdAndDelete(req.body._id);
+
+        res.json({ message: "User deleted successfully" });
     } catch (error) {
         res.status(500).send(error.message);
     }
 });
-adminRouter.get("/access", requireRole("manage_access"), (req, res) => {
-    // ... route logic ...
+
+// Grant access
+adminRouter.post("/access", requireRole("manage_access"), async (req, res) => {
+    try {
+        // Grant access to a user
+        const user = await User.findById(req.body.userId);
+        user.role = req.body.role;
+        await user.save();
+
+        res.json({ message: "Access granted successfully" });
+    } catch (error) {
+        res.status(500).send(error.message);
+    }
 });
-adminRouter.post("/access", requireRole("manage_access"), (req, res) => {
-    // ... route logic ...
+
+// Revoke access
+adminRouter.put("/access", requireRole("manage_access"), async (req, res) => {
+    try {
+        // Revoke access from a user
+        const user = await User.findById(req.body.userId);
+        user.role = patientRole._id;
+        await user.save();
+
+        res.json({ message: "Access revoked successfully" });
+    } catch (error) {
+        res.status(500).send(error.message);
+    }
 });
-adminRouter.put("/access", requireRole("manage_access"), (req, res) => {
-    // ... route logic ...
+
+// View access
+adminRouter.get("/access", requireRole("manage_access"), async (req, res) => {
+    try {
+        // Get all roles
+        const roles = await Role.find();
+
+        // Get all permissions
+        const permissions = await Permission.find();
+
+        // Create an object to store the access information
+        const access = {};
+
+        // Iterate over the roles
+        for (const role of roles) {
+            // Add the role name to the access object
+            access[role.name] = {};
+
+            // Iterate over the permissions
+            for (const permission of permissions) {
+                // Check if the role has the permission
+                if (role.permissions.includes(permission.name)) {
+                    // Add the permission to the access object
+                    access[role.name][permission.name] = true;
+                } else {
+                    // Add the permission to the access object with a value of false
+                    access[role.name][permission.name] = false;
+                }
+            }
+        }
+
+        // Send the access object to the client
+        res.json(access);
+    } catch (error) {
+        res.status(500).send(error.message);
+    }
 });
-adminRouter.delete("/access", requireRole("manage_access"), (req, res) => {
-    // ... route logic ...
-});
-adminRouter.get("/data", requireRole("analyze_data"), (req, res) => {
-    // ... route logic ...
-});
+
 router.use("/api/admin", adminRouter);
 
 // Use the router in your app
