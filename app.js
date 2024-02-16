@@ -437,6 +437,12 @@ app.use("/api/patient", patientRouter);
 app.use("/api/admin", adminRouter);
 
 // Start the server
-app.listen(port, () => {
-    console.log(`Server is running at http://localhost:${port}`);
-});
+app.listen(
+    port,
+    "https://patient-portal-tdtu-4f5fc756e767.herokuapp.com/",
+    () => {
+        console.log(
+            `Server is running at https://patient-portal-tdtu-4f5fc756e767.herokuapp.com:${port}`
+        );
+    }
+);
