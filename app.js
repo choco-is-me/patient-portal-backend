@@ -104,7 +104,7 @@ Role.find({}).then(async (roles) => {
             nurseRole.save(),
             patientRole.save(),
             adminRole.save(),
-        ]); // Add await here
+        ]);
     } else {
         // If roles exist, check each one for updates
         for (let role of roles) {
@@ -126,7 +126,6 @@ Role.find({}).then(async (roles) => {
             // If the permissions don't match, update the role
             if (!arraysEqual(role.permissions, updatedRole.permissions)) {
                 await Role.updateOne(
-                    // Add await here
                     { _id: role._id },
                     { $set: { permissions: updatedRole.permissions } }
                 );
@@ -187,9 +186,6 @@ function requirePermission(permission) {
             // Find the user
             const user = await User.findById(decodedToken.id);
 
-            // Log the decoded token
-            console.log(userRole);
-
             // Check if userRole is null
             if (!userRole) {
                 console.log(`Role not found with id: ${decodedToken.role}`);
@@ -214,6 +210,20 @@ function requirePermission(permission) {
 const patientRouter = express.Router();
 patientRouter.post("/register", async (req, res) => {
     try {
+        // Check if username already exists
+        const existingUser = await User.findOne({
+            username: req.body.username,
+        });
+        if (existingUser) {
+            return res.status(400).send("Username already exists");
+        }
+
+        // Fetch the Patient role from the database
+        const patientRole = await Role.findOne({ name: "Patient" });
+        if (!patientRole) {
+            return res.status(500).send("Patient role not found");
+        }
+
         // Hash the password
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
@@ -221,7 +231,7 @@ patientRouter.post("/register", async (req, res) => {
         const newUser = new User({
             username: req.body.username,
             password: hashedPassword,
-            role: patientRole._id,
+            role: patientRole._id, // Use the _id of the fetched Role document
             revokedPermissions: [],
         });
 
@@ -233,6 +243,7 @@ patientRouter.post("/register", async (req, res) => {
         res.status(500).send(error.message);
     }
 });
+
 patientRouter.post("/login", async (req, res) => {
     try {
         // Find the user
@@ -246,7 +257,12 @@ patientRouter.post("/login", async (req, res) => {
         } else {
             // On successful login, create JWT
             const token = jwt.sign(
-                { username: user.username, role: user.role._id.toString() },
+                {
+                    id: user._id.toString(), // Include user's _id in the payload
+                    username: user.username,
+                    role: user.role._id.toString(),
+                    revokedPermissions: user.revokedPermissions,
+                },
                 secret,
                 { expiresIn: "1h" }
             );
@@ -356,6 +372,14 @@ adminRouter.post(
     requirePermission("manage_users"),
     async (req, res) => {
         try {
+            // Check if username already exists
+            const existingUser = await User.findOne({
+                username: req.body.username,
+            });
+            if (existingUser) {
+                return res.status(400).send("Username already exists");
+            }
+
             // Hash the password
             const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
@@ -382,6 +406,17 @@ adminRouter.put(
     requirePermission("manage_users"),
     async (req, res) => {
         try {
+            // Check if username already exists
+            const existingUser = await User.findOne({
+                username: req.body.username,
+            });
+            if (
+                existingUser &&
+                String(existingUser._id) !== String(req.body._id)
+            ) {
+                return res.status(400).send("Username already exists");
+            }
+
             // Hash the password
             const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
@@ -466,29 +501,17 @@ adminRouter.post(
     }
 );
 
-// View all users
+// View all whole role schema
 adminRouter.get(
-    "/users",
-    requirePermission("manage_users"),
+    "/access",
+    requirePermission("manage_access"),
     async (req, res) => {
         try {
-            const users = await User.find().populate("role");
-            const usersWithPermissions = await Promise.all(
-                users.map(async (user) => {
-                    const role = await Role.findById(user.role);
-                    const allowedPermissions = role.permissions.filter(
-                        (permission) =>
-                            !user.revokedPermissions.includes(permission)
-                    );
-                    return {
-                        username: user.username,
-                        role: role.name,
-                        allowedPermissions: allowedPermissions,
-                        revokedPermissions: user.revokedPermissions,
-                    };
-                })
-            );
-            res.json(usersWithPermissions);
+            // Fetch all roles
+            const roles = await Role.find({}, "name permissions");
+
+            // Return roles
+            res.json(roles);
         } catch (error) {
             res.status(500).send(error.message);
         }
