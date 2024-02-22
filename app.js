@@ -4,6 +4,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { expressjwt: expressJwt } = require("express-jwt");
 const router = express.Router();
+const bodyParser = require("body-parser");
+const cors = require("cors");
 require("dotenv").config();
 
 const dbUser = process.env.DB_USER;
@@ -15,6 +17,7 @@ const UserSchema = new mongoose.Schema({
     username: String,
     password: String,
     role: String,
+    revokedPermissions: [String], // New field
 });
 
 // Define Role Schema
@@ -69,8 +72,9 @@ const adminRole = new Role({
 
 const adminUser = new User({
     username: "Admin",
-    password: "", // We'll set this later
+    password: "",
     role: adminRole._id,
+    revokedPermissions: [], // New field
 });
 
 // Use an IIFE (Immediately Invoked Function Expression) to use async/await at the top level
@@ -145,8 +149,10 @@ mongoose.connect(
 
 // Create an Express application
 const app = express();
-const port = 3000;
 app.use(express.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(cors());
 
 // Secret for JWT signing
 const secret = process.env.JWT_SECRET;
@@ -158,18 +164,53 @@ app.use(
     })
 );
 
-// Middleware for role checking
-function requireRole(role) {
+// Middleware for permission checking
+function requirePermission(permission) {
     return function (req, res, next) {
-        if (!req.user.role.permissions.includes(role)) {
-            res.status(403).send("Forbidden");
-        } else {
-            next();
+        const authHeader = req.headers["authorization"];
+
+        if (!authHeader) {
+            return res.status(403).send("Token is not provided");
         }
+
+        const token = authHeader.split(" ")[1]; // Extract the token from the Bearer
+
+        jwt.verify(token, secret, async (err, decodedToken) => {
+            if (err) {
+                console.log(err);
+                return res.status(403).send("Invalid token");
+            }
+
+            // Find the user's role
+            const userRole = await Role.findById(decodedToken.role);
+
+            // Find the user
+            const user = await User.findById(decodedToken.id);
+
+            // Log the decoded token
+            console.log(userRole);
+
+            // Check if userRole is null
+            if (!userRole) {
+                console.log(`Role not found with id: ${decodedToken.role}`);
+                return res.status(500).send("Role not found");
+            }
+
+            // Check if the role has the required permission
+            if (
+                !userRole.permissions.includes(permission) ||
+                user.revokedPermissions.includes(permission)
+            ) {
+                return res.status(403).send("Forbidden");
+            }
+
+            // If permission exists, proceed to the next middleware function
+            next();
+        });
     };
 }
 
-// Patient Router
+// Patient Router (Included public routes)
 const patientRouter = express.Router();
 patientRouter.post("/register", async (req, res) => {
     try {
@@ -180,18 +221,14 @@ patientRouter.post("/register", async (req, res) => {
         const newUser = new User({
             username: req.body.username,
             password: hashedPassword,
-            role: patientRole._id, // Assuming the role is patient for this register route
+            role: patientRole._id,
+            revokedPermissions: [],
         });
 
         // Save the new user
         await newUser.save();
 
-        // On successful registration, create JWT
-        const token = jwt.sign(
-            { username: newUser.username, role: patientRole.name },
-            secret
-        );
-        res.json({ token: token });
+        res.status(200).send("User registered successfully. Please log in.");
     } catch (error) {
         res.status(500).send(error.message);
     }
@@ -199,7 +236,9 @@ patientRouter.post("/register", async (req, res) => {
 patientRouter.post("/login", async (req, res) => {
     try {
         // Find the user
-        const user = await User.findOne({ username: req.body.username });
+        const user = await User.findOne({
+            username: req.body.username,
+        }).populate("role");
         if (!user) {
             res.status(401).send("User not found");
         } else if (!(await bcrypt.compare(req.body.password, user.password))) {
@@ -207,10 +246,11 @@ patientRouter.post("/login", async (req, res) => {
         } else {
             // On successful login, create JWT
             const token = jwt.sign(
-                { username: user.username, role: user.role.name },
-                secret
+                { username: user.username, role: user.role._id.toString() },
+                secret,
+                { expiresIn: "1h" }
             );
-            res.json({ token: token });
+            res.status(200).send({ token });
         }
     } catch (error) {
         res.status(500).send(error.message);
@@ -219,28 +259,28 @@ patientRouter.post("/login", async (req, res) => {
 
 patientRouter.post(
     "/appointments",
-    requireRole("book_appointment"),
+    requirePermission("book_appointment"),
     (req, res) => {
         res.send("Book an appointment");
     }
 );
 patientRouter.post(
     "/request-doctor",
-    requireRole("request_doctor"),
+    requirePermission("request_doctor"),
     (req, res) => {
         res.send("Request a doctor");
     }
 );
 patientRouter.get(
     "/consultations",
-    requireRole("view_consultation"),
+    requirePermission("view_consultation"),
     (req, res) => {
         res.send("View consultations");
     }
 );
 patientRouter.get(
     "/prescriptions",
-    requireRole("view_prescription"),
+    requirePermission("view_prescription"),
     (req, res) => {
         res.send("View prescriptions");
     }
@@ -251,30 +291,30 @@ router.use("/api/patient", patientRouter);
 const doctorRouter = express.Router();
 doctorRouter.get(
     "/consultations",
-    requireRole("conduct_consultation"),
+    requirePermission("conduct_consultation"),
     (req, res) => {
         res.send("Conduct consultations");
     }
 );
 doctorRouter.post(
     "/prescriptions",
-    requireRole("prescribe_medication"),
+    requirePermission("prescribe_medication"),
     (req, res) => {
         res.send("Prescribe medications");
     }
 );
 doctorRouter.get(
     "/appointments",
-    requireRole("view_appointments"),
+    requirePermission("view_appointments"),
     (req, res) => {
         res.send("View appointments");
     }
 );
 doctorRouter.put(
     "/medical-records",
-    requireRole("update_medical_records"),
+    requirePermission("update_medical_records"),
     (req, res) => {
-        res.send("Update medical records");
+        res.send("Update Medical Records");
     }
 );
 router.use("/api/doctor", doctorRouter);
@@ -283,14 +323,14 @@ router.use("/api/doctor", doctorRouter);
 const nurseRouter = express.Router();
 nurseRouter.get(
     "/appointments",
-    requireRole("manage_appointments"),
+    requirePermission("manage_appointments"),
     (req, res) => {
         res.send("Manage appointments");
     }
 );
 nurseRouter.post(
     "/follow-ups",
-    requireRole("patient_follow_up"),
+    requirePermission("patient_follow_up"),
     (req, res) => {
         res.send("Patient follow-ups");
     }
@@ -301,132 +341,159 @@ router.use("/api/nurse", nurseRouter);
 const adminRouter = express.Router();
 
 // Get all users
-adminRouter.get("/users", requireRole("manage_users"), async (req, res) => {
-    const users = await User.find().populate("role");
-    res.json(users);
-});
+adminRouter.get(
+    "/users",
+    requirePermission("manage_users"),
+    async (req, res) => {
+        const users = await User.find().populate("role");
+        res.json(users);
+    }
+);
 
 // Create a new user
-adminRouter.post("/users", requireRole("manage_users"), async (req, res) => {
-    try {
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(req.body.password, 10);
+adminRouter.post(
+    "/users",
+    requirePermission("manage_users"),
+    async (req, res) => {
+        try {
+            // Hash the password
+            const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
-        // Create a new user
-        const newUser = new User({
-            username: req.body.username,
-            password: hashedPassword,
-            role: req.body.role,
-        });
-
-        // Save the new user
-        await newUser.save();
-
-        res.json(newUser);
-    } catch (error) {
-        res.status(500).send(error.message);
-    }
-});
-
-// Update a user
-adminRouter.put("/users", requireRole("manage_users"), async (req, res) => {
-    try {
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(req.body.password, 10);
-
-        // Update the user
-        const updatedUser = await User.findByIdAndUpdate(
-            req.body._id,
-            {
+            // Create a new user
+            const newUser = new User({
                 username: req.body.username,
                 password: hashedPassword,
                 role: req.body.role,
-            },
-            { new: true }
-        );
+            });
 
-        res.json(updatedUser);
-    } catch (error) {
-        res.status(500).send(error.message);
+            // Save the new user
+            await newUser.save();
+
+            res.json(newUser);
+        } catch (error) {
+            res.status(500).send(error.message);
+        }
     }
-});
+);
+
+// Update a user
+adminRouter.put(
+    "/users",
+    requirePermission("manage_users"),
+    async (req, res) => {
+        try {
+            // Hash the password
+            const hashedPassword = await bcrypt.hash(req.body.password, 10);
+
+            // Update the user
+            const updatedUser = await User.findByIdAndUpdate(
+                req.body._id,
+                {
+                    username: req.body.username,
+                    password: hashedPassword,
+                    role: req.body.role,
+                },
+                { new: true }
+            );
+
+            res.json(updatedUser);
+        } catch (error) {
+            res.status(500).send(error.message);
+        }
+    }
+);
 
 // Delete a user
-adminRouter.delete("/users", requireRole("manage_users"), async (req, res) => {
-    try {
-        // Delete the user
-        await User.findByIdAndDelete(req.body._id);
+adminRouter.delete(
+    "/users",
+    requirePermission("manage_users"),
+    async (req, res) => {
+        try {
+            // Delete the user
+            await User.findByIdAndDelete(req.body._id);
 
-        res.json({ message: "User deleted successfully" });
-    } catch (error) {
-        res.status(500).send(error.message);
-    }
-});
-
-// Grant access
-adminRouter.post("/access", requireRole("manage_access"), async (req, res) => {
-    try {
-        // Grant access to a user
-        const user = await User.findById(req.body.userId);
-        user.role = req.body.role;
-        await user.save();
-
-        res.json({ message: "Access granted successfully" });
-    } catch (error) {
-        res.status(500).send(error.message);
-    }
-});
-
-// Revoke access
-adminRouter.put("/access", requireRole("manage_access"), async (req, res) => {
-    try {
-        // Revoke access from a user
-        const user = await User.findById(req.body.userId);
-        user.role = patientRole._id;
-        await user.save();
-
-        res.json({ message: "Access revoked successfully" });
-    } catch (error) {
-        res.status(500).send(error.message);
-    }
-});
-
-// View access
-adminRouter.get("/access", requireRole("manage_access"), async (req, res) => {
-    try {
-        // Get all roles
-        const roles = await Role.find();
-
-        // Get all permissions
-        const permissions = await Permission.find();
-
-        // Create an object to store the access information
-        const access = {};
-
-        // Iterate over the roles
-        for (const role of roles) {
-            // Add the role name to the access object
-            access[role.name] = {};
-
-            // Iterate over the permissions
-            for (const permission of permissions) {
-                // Check if the role has the permission
-                if (role.permissions.includes(permission.name)) {
-                    // Add the permission to the access object
-                    access[role.name][permission.name] = true;
-                } else {
-                    // Add the permission to the access object with a value of false
-                    access[role.name][permission.name] = false;
-                }
-            }
+            res.json({ message: "User deleted successfully" });
+        } catch (error) {
+            res.status(500).send(error.message);
         }
-
-        // Send the access object to the client
-        res.json(access);
-    } catch (error) {
-        res.status(500).send(error.message);
     }
-});
+);
+
+// Update role (Promote or demote a user)
+adminRouter.post(
+    "/access",
+    requirePermission("manage_access"),
+    async (req, res) => {
+        try {
+            const user = await User.findById(req.body.userId);
+            user.role = req.body.role;
+            await user.save();
+
+            res.json({ message: "Role granted successfully" });
+        } catch (error) {
+            res.status(500).send(error.message);
+        }
+    }
+);
+
+// Revoke permission
+adminRouter.post(
+    "/revoke",
+    requirePermission("manage_access"),
+    async (req, res) => {
+        try {
+            const user = await User.findById(req.body.userId);
+            if (!user) {
+                return res.status(404).send("User not found");
+            }
+
+            const permission = req.body.permission;
+            const userRole = await Role.findById(user.role);
+            if (!userRole.permissions.includes(permission)) {
+                return res.status(400).send("Invalid permission");
+            }
+
+            if (!user.revokedPermissions.includes(permission)) {
+                user.revokedPermissions.push(permission);
+                await user.save();
+                res.json({ message: "Permission revoked successfully" });
+            } else {
+                res.json({ message: "Permission already revoked" });
+            }
+        } catch (error) {
+            res.status(500).send(error.message);
+        }
+    }
+);
+
+// View all users
+adminRouter.get(
+    "/users",
+    requirePermission("manage_users"),
+    async (req, res) => {
+        try {
+            const users = await User.find().populate("role");
+            const usersWithPermissions = await Promise.all(
+                users.map(async (user) => {
+                    const role = await Role.findById(user.role);
+                    const allowedPermissions = role.permissions.filter(
+                        (permission) =>
+                            !user.revokedPermissions.includes(permission)
+                    );
+                    return {
+                        username: user.username,
+                        role: role.name,
+                        allowedPermissions: allowedPermissions,
+                        revokedPermissions: user.revokedPermissions,
+                    };
+                })
+            );
+            res.json(usersWithPermissions);
+        } catch (error) {
+            res.status(500).send(error.message);
+        }
+    }
+);
 
 router.use("/api/admin", adminRouter);
 
@@ -437,4 +504,7 @@ app.use("/api/patient", patientRouter);
 app.use("/api/admin", adminRouter);
 
 // start the server listening for requests
-app.listen(process.env.PORT || 3000, () => console.log("Server is running..."));
+const port = process.env.PORT;
+app.listen(port, () =>
+    console.log("Server is running at http://localhost:" + port + "/")
+);
