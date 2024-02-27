@@ -147,7 +147,6 @@ mongoose.connect(
 );
 
 // Create an Express application
-express - e[app];
 const app = express();
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -302,7 +301,6 @@ patientRouter.get(
         res.send("View prescriptions");
     }
 );
-router.use("/api/patient", patientRouter);
 
 // Doctor Router
 const doctorRouter = express.Router();
@@ -334,7 +332,6 @@ doctorRouter.put(
         res.send("Update Medical Records");
     }
 );
-router.use("/api/doctor", doctorRouter);
 
 // Nurse Router
 const nurseRouter = express.Router();
@@ -352,7 +349,6 @@ nurseRouter.post(
         res.send("Patient follow-ups");
     }
 );
-router.use("/api/nurse", nurseRouter);
 
 // Admin Router
 const adminRouter = express.Router();
@@ -519,6 +515,9 @@ adminRouter.get(
     }
 );
 
+router.use("/api/patient", patientRouter);
+router.use("/api/doctor", doctorRouter);
+router.use("/api/nurse", nurseRouter);
 router.use("/api/admin", adminRouter);
 
 // Use the router in your app
