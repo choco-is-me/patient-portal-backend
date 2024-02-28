@@ -9,6 +9,10 @@ const cors = require("cors");
 const https = require("https");
 const fs = require("fs");
 
+const connectDB = require("./connectMongo");
+
+connectDB();
+
 // Create an Express application
 const app = express();
 app.use(express.json());
@@ -522,10 +526,6 @@ const port = process.env.PORT;
 //     .listen(3000, function () {
 //         console.log("Server is running at https://localhost:" + port + "/");
 //     });
-
-const connectDB = require("./connectMongo");
-
-connectDB();
 
 app.listen(port, function () {
     console.log("Server is running at http://localhost:" + port + "/");
