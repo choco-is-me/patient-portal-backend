@@ -14,23 +14,7 @@ const dbUser = process.env.DB_USER;
 const dbPass = process.env.DB_PASS;
 const adminPassword = process.env.ADMIN_PASSWORD;
 
-// Define User Schema
-const UserSchema = new mongoose.Schema({
-    username: String,
-    password: String,
-    role: String,
-    revokedPermissions: [String], // New field
-});
-
-// Define Role Schema
-const RoleSchema = new mongoose.Schema({
-    name: String,
-    permissions: [String],
-});
-
-// Create Models
-const User = mongoose.model("User", UserSchema);
-const Role = mongoose.model("Role", RoleSchema);
+const { User, Role } = require("./models");
 
 // Add values to the Role Schema
 const doctorRole = new Role({
@@ -140,9 +124,6 @@ Role.find({}).then(async (roles) => {
 function arraysEqual(a, b) {
     return a.sort().toString() === b.sort().toString();
 }
-
-// Update the User Schema to include role
-UserSchema.add({ role: { type: mongoose.Schema.Types.ObjectId, ref: "Role" } });
 
 mongoose.connect(
     `mongodb+srv://${dbUser}:${dbPass}@patientportaldata.uu1v0ci.mongodb.net/?retryWrites=true&w=majority`
