@@ -9,13 +9,26 @@ const cors = require("cors");
 const https = require("https");
 const fs = require("fs");
 
-const connectDB = require("./connectMongo");
+// Create an Express application
+const app = express();
+app.use(express.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(cors());
 
-connectDB();
+// Secret for JWT signing
+const secret = process.env.JWT_SECRET;
 
-const { User, Role } = require("./models");
+// Middleware to check JWT
+app.use(
+    expressJwt({ secret: secret, algorithms: ["HS256"] }).unless({
+        path: ["/api/patient/register", "/api/patient/login"],
+    })
+);
 
-console.log(User, Role);
+//Define models
+const { User } = require("./models/UserModel");
+const { Role } = require("./models/RoleModel");
 
 // Add values to the Role Schema
 const doctorRole = new Role({
@@ -126,23 +139,6 @@ Role.find({}).then(async (roles) => {
 function arraysEqual(a, b) {
     return a.sort().toString() === b.sort().toString();
 }
-
-// Create an Express application
-const app = express();
-app.use(express.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
-app.use(cors());
-
-// Secret for JWT signing
-const secret = process.env.JWT_SECRET;
-
-// Middleware to check JWT
-app.use(
-    expressJwt({ secret: secret, algorithms: ["HS256"] }).unless({
-        path: ["/api/patient/register", "/api/patient/login"],
-    })
-);
 
 // Middleware for permission checking
 function requirePermission(permission) {
@@ -521,6 +517,10 @@ const port = process.env.PORT;
 //     .listen(3000, function () {
 //         console.log("Server is running at https://localhost:" + port + "/");
 //     });
+
+const connectDB = require("./connectMongo");
+
+connectDB();
 
 app.listen(port, function () {
     console.log("Server is running at http://localhost:" + port + "/");
