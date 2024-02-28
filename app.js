@@ -512,14 +512,18 @@ app.use("/api/admin", adminRouter);
 // start the server listening for requests
 const port = process.env.PORT;
 
-https
-    .createServer(
-        {
-            key: fs.readFileSync("server.key"),
-            cert: fs.readFileSync("server.cert"),
-        },
-        app
-    )
-    .listen(3000, function () {
-        console.log("Server is running at https://localhost:" + port + "/");
-    });
+// https
+//     .createServer(
+//         {
+//             key: fs.readFileSync("server.key"),
+//             cert: fs.readFileSync("server.cert"),
+//         },
+//         app
+//     )
+//     .listen(3000, function () {
+//         console.log("Server is running at https://localhost:" + port + "/");
+//     });
+
+app.listen(port, function () {
+    console.log("Server is running at http://localhost:" + port + "/");
+});
