@@ -502,13 +502,13 @@ app.use("/api/nurse", nurseRouter);
 app.use("/api/patient", patientRouter);
 app.use("/api/admin", adminRouter);
 
-const connectDB = require("./connectMongo");
-
-connectDB();
-
 // start the server listening for requests
 const port = process.env.PORT;
 
 app.listen(port, function () {
     console.log("Server is running at http://localhost:" + port + "/");
 });
+
+const connectDB = require("./connectMongo");
+
+connectDB();
