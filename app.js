@@ -198,7 +198,7 @@ app.get("/", async (req, res) => {
             data1 = await User.find();
             data2 = await Role.find();
             fetched = true;
-            res.status(200).send(data);
+            res.status(200).send("Data fetched successfully!");
         } catch (error) {
             console.error(error);
             res.status(500).send(error.message);
