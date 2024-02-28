@@ -184,6 +184,8 @@ app.get("/", (req, res) => {
     res.send("Welcome to our server!");
 });
 
+app.get("/favicon.ico", (req, res) => res.status(204).end());
+
 // Patient Router (Included public routes)
 const patientRouter = express.Router();
 
