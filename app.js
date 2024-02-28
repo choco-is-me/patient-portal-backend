@@ -9,11 +9,7 @@ const cors = require("cors");
 const https = require("https");
 const fs = require("fs");
 require("dotenv").config();
-
-const dbUser = process.env.DB_USER;
-const dbPass = process.env.DB_PASS;
 const adminPassword = process.env.ADMIN_PASSWORD;
-
 const { User, Role } = require("./models");
 
 // Add values to the Role Schema
@@ -125,9 +121,7 @@ function arraysEqual(a, b) {
     return a.sort().toString() === b.sort().toString();
 }
 
-mongoose.connect(
-    `mongodb+srv://${dbUser}:${dbPass}@patientportaldata.uu1v0ci.mongodb.net/?retryWrites=true&w=majority`
-);
+mongoose.connect(process.env.MONGODB_CONNECT_URI);
 
 // Create an Express application
 const app = express();
