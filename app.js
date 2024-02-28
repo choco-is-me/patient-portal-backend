@@ -98,12 +98,10 @@ Role.find({}).then(async (roles) => {
     // Add async here
     if (roles.length === 0) {
         // If no roles exist, create them
-        await Promise.all([
-            doctorRole.save(),
-            nurseRole.save(),
-            patientRole.save(),
-            adminRole.save(),
-        ]);
+        await doctorRole.save();
+        await nurseRole.save();
+        await patientRole.save();
+        await adminRole.save();
     } else {
         // If roles exist, check each one for updates
         for (let role of roles) {
@@ -502,13 +500,13 @@ app.use("/api/nurse", nurseRouter);
 app.use("/api/patient", patientRouter);
 app.use("/api/admin", adminRouter);
 
+const connectDB = require("./connectMongo");
+
+connectDB();
+
 // start the server listening for requests
 const port = process.env.PORT;
 
 app.listen(port, function () {
     console.log("Server is running at http://localhost:" + port + "/");
 });
-
-const connectDB = require("./connectMongo");
-
-connectDB();
