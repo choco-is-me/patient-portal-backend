@@ -194,7 +194,7 @@ let fetched = false;
 app.get("/", async (req, res) => {
     if (!fetched) {
         try {
-            data = await YourModel.find();
+            data = await User.find();
             fetched = true;
             res.status(200).send(data);
         } catch (error) {
