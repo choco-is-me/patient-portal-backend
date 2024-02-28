@@ -9,6 +9,7 @@ const cors = require("cors");
 const https = require("https");
 const fs = require("fs");
 require("dotenv").config();
+mongoose.connect(process.env.MONGODB_URI);
 const adminPassword = process.env.ADMIN_PASSWORD;
 const { User, Role } = require("./models");
 
@@ -120,8 +121,6 @@ Role.find({}).then(async (roles) => {
 function arraysEqual(a, b) {
     return a.sort().toString() === b.sort().toString();
 }
-
-mongoose.connect(process.env.MONGODB_CONNECT_URI);
 
 // Create an Express application
 const app = express();
