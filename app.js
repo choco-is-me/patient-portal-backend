@@ -99,46 +99,44 @@ const adminUser = new User({
     }
 })();
 
-Role.find({}).then(async (roles) => {
-    // Add async here
-    if (roles.length === 0) {
-        // If no roles exist, create them
-        await doctorRole.save();
-        await nurseRole.save();
-        await patientRole.save();
-        await adminRole.save();
-    } else {
-        // If roles exist, check each one for updates
-        for (let role of roles) {
-            let updatedRole;
-            switch (role.name) {
-                case "Doctor":
-                    updatedRole = doctorRole;
-                    break;
-                case "Nurse":
-                    updatedRole = nurseRole;
-                    break;
-                case "Patient":
-                    updatedRole = patientRole;
-                    break;
-                case "Administrator":
-                    updatedRole = adminRole;
-                    break;
-            }
-            // If the permissions don't match, update the role
-            if (!arraysEqual(role.permissions, updatedRole.permissions)) {
-                await Role.updateOne(
-                    { _id: role._id },
-                    { $set: { permissions: updatedRole.permissions } }
-                );
-            }
-        }
-    }
-});
-
 process.on("unhandledRejection", (reason, p) => {
     console.log("Unhandled Rejection at: Promise", p, "reason:", reason);
-    // application specific logging, throwing an error, or other logic here
+    Role.find({}).then(async (roles) => {
+        // Add async here
+        if (roles.length === 0) {
+            // If no roles exist, create them
+            await doctorRole.save();
+            await nurseRole.save();
+            await patientRole.save();
+            await adminRole.save();
+        } else {
+            // If roles exist, check each one for updates
+            for (let role of roles) {
+                let updatedRole;
+                switch (role.name) {
+                    case "Doctor":
+                        updatedRole = doctorRole;
+                        break;
+                    case "Nurse":
+                        updatedRole = nurseRole;
+                        break;
+                    case "Patient":
+                        updatedRole = patientRole;
+                        break;
+                    case "Administrator":
+                        updatedRole = adminRole;
+                        break;
+                }
+                // If the permissions don't match, update the role
+                if (!arraysEqual(role.permissions, updatedRole.permissions)) {
+                    await Role.updateOne(
+                        { _id: role._id },
+                        { $set: { permissions: updatedRole.permissions } }
+                    );
+                }
+            }
+        }
+    });
 });
 
 // Helper function to check if two arrays are equal
