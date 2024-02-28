@@ -188,13 +188,15 @@ function requirePermission(permission) {
 }
 
 // Default Route
-let data;
+let data1;
+let data2;
 let fetched = false;
 
 app.get("/", async (req, res) => {
     if (!fetched) {
         try {
-            data = await User.find();
+            data1 = await User.find();
+            data2 = await Role.find();
             fetched = true;
             res.status(200).send(data);
         } catch (error) {
