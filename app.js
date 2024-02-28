@@ -20,7 +20,7 @@ const secret = process.env.JWT_SECRET;
 // Middleware to check JWT
 app.use(
     expressJwt({ secret: secret, algorithms: ["HS256"] }).unless({
-        path: ["/api/patient/register", "/api/patient/login"],
+        path: ["/", "/api/patient/register", "/api/patient/login"],
     })
 );
 
@@ -178,6 +178,11 @@ function requirePermission(permission) {
         });
     };
 }
+
+// Default Route
+app.get("/", (req, res) => {
+    res.send("Welcome to our server!");
+});
 
 // Patient Router (Included public routes)
 const patientRouter = express.Router();
