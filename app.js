@@ -183,6 +183,11 @@ function requirePermission(permission) {
     };
 }
 
+// Default route
+app.get("/", (req, res) => {
+    res.send("Welcome to my API!");
+});
+
 // Patient Router (Included public routes)
 const patientRouter = express.Router();
 patientRouter.post("/register", async (req, res) => {
