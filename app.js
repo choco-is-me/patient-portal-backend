@@ -195,8 +195,8 @@ let fetched = false;
 app.get("/", async (req, res) => {
     if (!fetched) {
         try {
-            data1 = await User.find();
-            data2 = await Role.find();
+            data1 = await User.find().populate("_id");
+            data2 = await Role.find().populate("_id");
             fetched = true;
             res.status(200).send("Data fetched successfully!");
         } catch (error) {
