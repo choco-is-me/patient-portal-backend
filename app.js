@@ -1,5 +1,5 @@
+require("dotenv").config();
 const express = require("express");
-const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { expressjwt: expressJwt } = require("express-jwt");
@@ -8,9 +8,28 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const https = require("https");
 const fs = require("fs");
-require("dotenv").config();
-mongoose.connect(process.env.MONGODB_URI);
-const adminPassword = process.env.ADMIN_PASSWORD;
+
+// Create an Express application
+const app = express();
+app.use(express.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(cors());
+
+// Secret for JWT signing
+const secret = process.env.JWT_SECRET;
+
+// Middleware to check JWT
+app.use(
+    expressJwt({ secret: secret, algorithms: ["HS256"] }).unless({
+        path: ["/api/patient/register", "/api/patient/login"],
+    })
+);
+
+const connectDB = require("./connectMongo");
+
+connectDB();
+
 const { User, Role } = require("./models");
 
 // Add values to the Role Schema
@@ -53,6 +72,7 @@ const adminRole = new Role({
     ],
 });
 
+const adminPassword = process.env.ADMIN_PASSWORD;
 const adminUser = new User({
     username: "Admin",
     password: "",
@@ -121,23 +141,6 @@ Role.find({}).then(async (roles) => {
 function arraysEqual(a, b) {
     return a.sort().toString() === b.sort().toString();
 }
-
-// Create an Express application
-const app = express();
-app.use(express.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
-app.use(cors());
-
-// Secret for JWT signing
-const secret = process.env.JWT_SECRET;
-
-// Middleware to check JWT
-app.use(
-    expressJwt({ secret: secret, algorithms: ["HS256"] }).unless({
-        path: ["/api/patient/register", "/api/patient/login"],
-    })
-);
 
 // Middleware for permission checking
 function requirePermission(permission) {
