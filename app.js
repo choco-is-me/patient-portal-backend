@@ -138,10 +138,6 @@ function arraysEqual(a, b) {
     return a.sort().toString() === b.sort().toString();
 }
 
-const connectDB = require("./connectMongo");
-
-connectDB();
-
 // Middleware for permission checking
 function requirePermission(permission) {
     return function (req, res, next) {
@@ -505,6 +501,10 @@ app.use("/api/doctor", doctorRouter);
 app.use("/api/nurse", nurseRouter);
 app.use("/api/patient", patientRouter);
 app.use("/api/admin", adminRouter);
+
+const connectDB = require("./connectMongo");
+
+connectDB();
 
 // start the server listening for requests
 const port = process.env.PORT;
