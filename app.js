@@ -7,10 +7,6 @@ const router = express.Router();
 const bodyParser = require("body-parser");
 const cors = require("cors");
 
-const connectDB = require("./connectMongo");
-
-connectDB();
-
 // Create an Express application
 const app = express();
 app.use(express.json());
@@ -141,6 +137,10 @@ Role.find({}).then(async (roles) => {
 function arraysEqual(a, b) {
     return a.sort().toString() === b.sort().toString();
 }
+
+const connectDB = require("./connectMongo");
+
+connectDB();
 
 // Middleware for permission checking
 function requirePermission(permission) {
