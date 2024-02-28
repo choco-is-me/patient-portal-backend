@@ -15,6 +15,8 @@ connectDB();
 
 const { User, Role } = require("./models");
 
+console.log(User, Role);
+
 // Add values to the Role Schema
 const doctorRole = new Role({
     name: "Doctor",
