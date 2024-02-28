@@ -20,7 +20,12 @@ const secret = process.env.JWT_SECRET;
 // Middleware to check JWT
 app.use(
     expressJwt({ secret: secret, algorithms: ["HS256"] }).unless({
-        path: ["/", "/api/patient/register", "/api/patient/login"],
+        path: [
+            "/favicon.ico",
+            "/",
+            "/api/patient/register",
+            "/api/patient/login",
+        ],
     })
 );
 
