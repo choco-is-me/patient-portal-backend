@@ -188,8 +188,22 @@ function requirePermission(permission) {
 }
 
 // Default Route
-app.get("/", (req, res) => {
-    res.send("Welcome to our server!");
+let data;
+let fetched = false;
+
+app.get("/", async (req, res) => {
+    if (!fetched) {
+        try {
+            data = await YourModel.find();
+            fetched = true;
+            res.status(200).send(data);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send(error.message);
+        }
+    } else {
+        res.sendStatus(304);
+    }
 });
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
