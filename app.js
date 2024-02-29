@@ -99,44 +99,41 @@ const adminUser = new User({
     }
 })();
 
-process.on("unhandledRejection", (reason, p) => {
-    console.log("Unhandled Rejection at: Promise", p, "reason:", reason);
-    Role.find({}).then(async (roles) => {
-        // Add async here
-        if (roles.length === 0) {
-            // If no roles exist, create them
-            await doctorRole.save();
-            await nurseRole.save();
-            await patientRole.save();
-            await adminRole.save();
-        } else {
-            // If roles exist, check each one for updates
-            for (let role of roles) {
-                let updatedRole;
-                switch (role.name) {
-                    case "Doctor":
-                        updatedRole = doctorRole;
-                        break;
-                    case "Nurse":
-                        updatedRole = nurseRole;
-                        break;
-                    case "Patient":
-                        updatedRole = patientRole;
-                        break;
-                    case "Administrator":
-                        updatedRole = adminRole;
-                        break;
-                }
-                // If the permissions don't match, update the role
-                if (!arraysEqual(role.permissions, updatedRole.permissions)) {
-                    await Role.updateOne(
-                        { _id: role._id },
-                        { $set: { permissions: updatedRole.permissions } }
-                    );
-                }
+Role.find({}).then(async (roles) => {
+    // Add async here
+    if (roles.length === 0) {
+        // If no roles exist, create them
+        await doctorRole.save();
+        await nurseRole.save();
+        await patientRole.save();
+        await adminRole.save();
+    } else {
+        // If roles exist, check each one for updates
+        for (let role of roles) {
+            let updatedRole;
+            switch (role.name) {
+                case "Doctor":
+                    updatedRole = doctorRole;
+                    break;
+                case "Nurse":
+                    updatedRole = nurseRole;
+                    break;
+                case "Patient":
+                    updatedRole = patientRole;
+                    break;
+                case "Administrator":
+                    updatedRole = adminRole;
+                    break;
+            }
+            // If the permissions don't match, update the role
+            if (!arraysEqual(role.permissions, updatedRole.permissions)) {
+                await Role.updateOne(
+                    { _id: role._id },
+                    { $set: { permissions: updatedRole.permissions } }
+                );
             }
         }
-    });
+    }
 });
 
 // Helper function to check if two arrays are equal
@@ -187,23 +184,8 @@ function requirePermission(permission) {
     };
 }
 
-// Default Route
-let data1;
-let fetched = false;
-
 app.get("/", async (req, res) => {
-    if (!fetched) {
-        try {
-            data1 = await User.find().populate("role");
-            fetched = true;
-            res.status(200).send("Data fetched successfully!");
-        } catch (error) {
-            console.error(error);
-            res.status(500).send(error.message);
-        }
-    } else {
-        res.sendStatus(304);
-    }
+    res.status(200).send("Server Deployed Successfully!");
 });
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
