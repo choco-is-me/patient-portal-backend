@@ -9,6 +9,8 @@ routes.get("/", async function (req, res) {
     res.send("<h1>Welcome to the Hospital Management System</h1>");
 });
 
+routes.get("/favicon.ico", (req, res) => res.status(204).end());
+
 routes.use("/api/patient", patient);
 routes.use("/api/nurse", nurse);
 routes.use("/api/doctor", doctor);
