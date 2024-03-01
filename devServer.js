@@ -2,7 +2,10 @@ const app = require("./app");
 const routes = require("./routes/router");
 
 app.use("/", routes);
-app.use("/api", routes);
+app.use("/api/admin", routes);
+app.use("/api/doctor", routes);
+app.use("/api/nurse", routes);
+app.use("/api/patient", routes);
 
 // start the server listening for requests
 const port = process.env.PORT;
