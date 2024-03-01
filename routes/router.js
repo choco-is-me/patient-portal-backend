@@ -5,7 +5,6 @@ const doctor = require("./doctor");
 const admin = require("./admin");
 
 routes.get("/", async function (req, res) {
-    //homepage route returns some HTML
     res.send("<h1>Welcome to the Hospital Management System</h1>");
 });
 
