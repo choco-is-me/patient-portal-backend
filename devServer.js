@@ -2,6 +2,7 @@ const app = require("./app");
 const routes = require("./routes/router");
 
 app.use("/", routes);
+app.use("/api", routes);
 
 // start the server listening for requests
 const port = process.env.PORT;
