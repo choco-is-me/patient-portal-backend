@@ -56,39 +56,48 @@ function arraysEqual(a, b) {
 
 const initializeMongo = () => {
     Role.find({}).then(async (roles) => {
-        // Add async here
-        if (roles.length === 0) {
-            // If no roles exist, create them
-            await doctorRole.save();
-            await nurseRole.save();
-            await patientRole.save();
-            await adminRole.save();
-        } else {
-            // If roles exist, check each one for updates
-            for (let role of roles) {
-                let updatedRole;
-                switch (role.name) {
-                    case "Doctor":
-                        updatedRole = doctorRole;
-                        break;
-                    case "Nurse":
-                        updatedRole = nurseRole;
-                        break;
-                    case "Patient":
-                        updatedRole = patientRole;
-                        break;
-                    case "Administrator":
-                        updatedRole = adminRole;
-                        break;
-                }
-                // If the permissions don't match, update the role
-                if (!arraysEqual(role.permissions, updatedRole.permissions)) {
-                    await Role.updateOne(
-                        { _id: role._id },
-                        { $set: { permissions: updatedRole.permissions } }
-                    );
+        try {
+            if (roles.length === 0) {
+                // If no roles exist, create them
+                let promises = [
+                    doctorRole.save(),
+                    nurseRole.save(),
+                    patientRole.save(),
+                    adminRole.save(),
+                ];
+                await Promise.all(promises);
+            } else {
+                // If roles exist, check each one for updates
+                for (let role of roles) {
+                    let updatedRole;
+                    switch (role.name) {
+                        case "Doctor":
+                            updatedRole = doctorRole;
+                            break;
+                        case "Nurse":
+                            updatedRole = nurseRole;
+                            break;
+                        case "Patient":
+                            updatedRole = patientRole;
+                            break;
+                        case "Administrator":
+                            updatedRole = adminRole;
+                            break;
+                    }
+                    // If the permissions don't match, update the role
+                    if (
+                        !arraysEqual(role.permissions, updatedRole.permissions)
+                    ) {
+                        await Role.updateOne(
+                            { _id: role._id },
+                            { $set: { permissions: updatedRole.permissions } }
+                        );
+                    }
                 }
             }
+        } catch (error) {
+            console.error("An error occurred:", error);
+            throw error; // This will prevent Unhandled Promise Rejection
         }
     });
 

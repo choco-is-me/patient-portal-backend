@@ -5,7 +5,7 @@ const doctor = require("./doctor");
 const admin = require("./admin");
 
 routes.get("/", async function (req, res) {
-    res.send("<h1>Welcome to the Hospital Management System</h1>");
+    res.send("Success!");
 });
 
 routes.get("/favicon.ico", (req, res) => res.status(204).end());
