@@ -26,6 +26,8 @@ function requirePermission(permission) {
             // Find the user
             const user = await User.findById(decodedToken.id);
 
+            req.user = user;
+
             // Check if userRole is null
             if (!userRole) {
                 console.log(`Role not found with id: ${decodedToken.role}`);
