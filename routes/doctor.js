@@ -2,13 +2,6 @@
 const doctorRouter = require("express").Router();
 const requirePermission = require("./permission");
 
-doctorRouter.get(
-    "/consultations",
-    requirePermission("conduct_consultation"),
-    (req, res) => {
-        res.send("Conduct consultations");
-    }
-);
 doctorRouter.post(
     "/prescriptions",
     requirePermission("prescribe_medication"),

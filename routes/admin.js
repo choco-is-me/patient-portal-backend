@@ -1,8 +1,8 @@
 // Admin Router
 const adminRouter = require("express").Router();
 const bcrypt = require("bcryptjs");
-const { User } = require("../models/UserModel");
-const { Role } = require("../models/RoleModel");
+const User = require("../models/UserModel");
+const Role = require("../models/RoleModel");
 const requirePermission = require("./permission");
 
 // Get all users

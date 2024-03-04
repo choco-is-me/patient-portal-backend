@@ -8,4 +8,4 @@ const UserSchema = new mongoose.Schema({
     revokedPermissions: [String], // New field
 });
 
-exports.User = mongoose.model("User", UserSchema);
+module.exports = mongoose.model("User", UserSchema);

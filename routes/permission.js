@@ -1,8 +1,8 @@
 // Middleware for permission checking
 const jwt = require("jsonwebtoken");
 const secret = process.env.JWT_SECRET;
-const { User } = require("../models/UserModel");
-const { Role } = require("../models/RoleModel");
+const User = require("../models/UserModel");
+const Role = require("../models/RoleModel");
 
 function requirePermission(permission) {
     return function (req, res, next) {
