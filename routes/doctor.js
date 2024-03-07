@@ -232,6 +232,57 @@ doctorRouter.delete(
     }
 );
 
+// Create a new prescription
+doctorRouter.post(
+    "/createPrescription/:patientId",
+    requirePermission("create_prescription"),
+    async (req, res) => {
+        const { healthStatus, medicines } = req.body;
+        const doctorId = req.user._id; // Get the doctor's ID from req.user
+        const patientId = req.params.patientId; // Get the patient's ID from the URL
+
+        try {
+            // Check if the doctor has an appointment with the patient
+            const appointment = await Appointment.findOne({
+                patient: patientId,
+                doctor: doctorId,
+            });
+            if (!appointment) {
+                return res.status(400).json({
+                    message:
+                        "No appointment found between this doctor and patient.",
+                });
+            }
+
+            // Create a new prescription
+            const prescription = new Prescription({
+                patient: patientId,
+                doctor: doctorId,
+                healthStatus,
+                medicines,
+            });
+
+            await prescription.save();
+
+            // Update the patient record with the new prescription
+            const patientRecord = await PatientRecord.findOne({
+                patient: patientId,
+            });
+            if (patientRecord) {
+                patientRecord.medicineTaken.push(prescription._id);
+                await patientRecord.save();
+            }
+
+            res.status(200).json({
+                message:
+                    "Prescription created and patient record updated successfully.",
+            });
+        } catch (error) {
+            res.status(500).json({ message: "Server error." });
+        }
+    }
+);
+
 // Update an existing prescription
 doctorRouter.put(
     "/prescription/:id",
@@ -262,14 +313,22 @@ doctorRouter.delete(
     requirePermission("delete_prescription"),
     async (req, res) => {
         try {
-            const prescription = await Prescription.findByIdAndDelete(
-                req.params.id
-            );
+            const prescription = await Prescription.findById(req.params.id);
             if (!prescription) {
                 return res
                     .status(404)
                     .json({ error: "Prescription not found" });
             }
+
+            // Check if the logged-in doctor is the same doctor who created the prescription
+            if (prescription.doctor.toString() !== req.user._id.toString()) {
+                return res.status(403).json({
+                    error: "You do not have permission to delete this prescription",
+                });
+            }
+
+            // Delete the prescription
+            await Prescription.findByIdAndDelete(req.params.id);
             res.json({ message: "Prescription deleted successfully" });
         } catch (error) {
             console.error(error);
