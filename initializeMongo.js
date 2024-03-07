@@ -8,11 +8,11 @@ const HealthIssue = require("./models/HealthIssue");
 const patientRole = new Role({
     name: "Patient",
     permissions: [
-        "register_account",
-        "login",
+        "view_doctors",
         "book_appointment",
-        "request_doctor",
-        "view_consultation",
+        "view_appointments",
+        "update_appointment",
+        "cancel_appointment_on_pending",
         "view_prescription",
     ],
 });
@@ -20,10 +20,17 @@ const patientRole = new Role({
 const doctorRole = new Role({
     name: "Doctor",
     permissions: [
-        "conduct_consultation",
-        "prescribe_medication",
         "view_appointments",
-        "update_medical_records",
+        "delete_appointments",
+        "change_appointment_status",
+        "view_patient_records",
+        "update_patient_records",
+        "autofill_prescription",
+        "create_prescription",
+        "update_prescription",
+        "delete_prescription",
+        "create_healthIssue",
+        "delete_healthIssue",
     ],
 });
 
@@ -36,14 +43,6 @@ const adminRole = new Role({
         ...doctorRole.permissions,
         ...patientRole.permissions,
     ],
-});
-
-// Define user
-const adminUser = new User({
-    username: "Admin",
-    password: "",
-    role: adminRole._id,
-    revokedPermissions: [], // New field
 });
 
 // Define health issues
@@ -84,94 +83,75 @@ let healthIssues = [
     },
 ];
 
-// Helper function to check if two arrays are equal
-function arraysEqual(a, b) {
-    return a.sort().toString() === b.sort().toString();
-}
-
 // Function to initialize MongoDB with roles, admin user, and health issues
 const initializeMongo = () => {
-    // Check if roles exist then create them. If they exist, update them if necessary.
-    Role.find({}).then(async (roles) => {
-        try {
-            if (roles.length === 0) {
-                // If no roles exist, create them
-                let promises = [
-                    doctorRole.save(),
-                    patientRole.save(),
-                    adminRole.save(),
-                ];
-                await Promise.allSettled(promises);
-            } else {
-                // If roles exist, check each one for updates
-                let updates = [];
-                for (let role of roles) {
-                    let updatedRole;
-                    switch (role.name) {
-                        case "Doctor":
-                            updatedRole = doctorRole;
-                            break;
-                        case "Patient":
-                            updatedRole = patientRole;
-                            break;
-                        case "Administrator":
-                            updatedRole = adminRole;
-                            break;
-                    }
-                    // If the permissions don't match, prepare the update operation
-                    if (
-                        !arraysEqual(role.permissions, updatedRole.permissions)
-                    ) {
-                        updates.push({
-                            updateOne: {
-                                filter: { _id: role._id },
-                                update: {
-                                    $set: {
-                                        permissions: updatedRole.permissions,
-                                    },
-                                },
-                            },
-                        });
-                    }
-                }
-                // Execute all update operations
-                if (updates.length > 0) {
-                    await Role.bulkWrite(updates);
-                }
-            }
-        } catch (error) {
-            console.error("An error occurred:", error);
-            throw error;
-        }
-    });
-
+    let roles = [doctorRole, patientRole, adminRole];
     // Use an IIFE (Immediately Invoked Function Expression) to use async/await at the top level
     // This is necessary because top-level await is not supported in Node.js yet
-    (async function () {
-        try {
-            // Check if admin user already exists
-            const existingAdmin = await User.findOne({ username: "Admin" });
+    try {
+        // Use an IIFE to use async/await at the top level
+        (async function () {
+            try {
+                let savedRoles = await Promise.all(
+                    roles.map((role) => {
+                        // Create a new object from the role object without the _id field
+                        let { _id, ...roleWithoutId } = role.toObject();
+                        return Role.findOneAndUpdate(
+                            { name: role.name },
+                            { $set: roleWithoutId },
+                            { upsert: true, new: true }
+                        ).exec(); // Add exec() to return a true Promise
+                    })
+                );
 
-            if (!existingAdmin) {
-                adminUser.password = await bcrypt.hash(adminPassword, 10);
-                await adminUser.save();
+                console.log("All roles added or updated successfully!");
+
+                // Find the adminRole from the savedRoles
+                let adminRole = savedRoles.find(
+                    (role) => role.name === "Administrator"
+                );
+
+                // Hash the password
+                const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
+                // Update the admin user, or create it if it doesn't exist
+                await User.findOneAndUpdate(
+                    { username: { $in: ["Admin", "Choco"] } }, // Check for both "Admin" and "Choco"
+                    {
+                        $set: {
+                            username: "Choco", // User name you want to change to (if you want to change to a new name, you have to add it to the username field right above this line)
+                            password: hashedPassword, // THE PASSWORD IS IN THE .env FILE
+                            role: adminRole._id,
+                            revokedPermissions: [],
+                        },
+                    },
+                    { upsert: true }
+                );
+
                 console.log("Admin user saved successfully!");
-            } else {
-                console.log("Admin user already exists.");
+            } catch (err) {
+                console.error(err);
             }
-        } catch (err) {
-            console.error(
-                "An error occurred while creating the admin user:",
-                err
-            );
-        }
-    })();
+        })();
+    } catch (err) {
+        console.error("An error occurred during setup:", err);
+    }
 
     // Same as above, use an IIFE to use async/await at the top level
     (async function () {
         try {
-            await HealthIssue.insertMany(healthIssues);
-            console.log("All health issues added successfully");
+            for (let issue of healthIssues) {
+                // Check if the health issue already exists in the database
+                let existingIssue = await HealthIssue.findOne({
+                    healthStatus: issue.healthStatus,
+                });
+
+                // If it doesn't exist, insert it
+                if (!existingIssue) {
+                    await HealthIssue.create(issue);
+                }
+            }
+            console.log("All health issues added successfully!");
         } catch (err) {
             console.error(err);
         }

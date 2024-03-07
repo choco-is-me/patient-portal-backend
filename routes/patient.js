@@ -7,6 +7,7 @@ const secret = process.env.JWT_SECRET;
 const User = require("../models/UserModel");
 const Role = require("../models/RoleModel");
 const Appointment = require("../models/Appointment");
+const PatientRecord = require("../models/PatientRecord");
 const Prescription = require("../models/Prescription");
 const requirePermission = require("./permission");
 
@@ -30,16 +31,31 @@ patientRouter.post("/register", async (req, res) => {
         // Hash the password
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
-        // Create a new user
+        // Create a new user with additional information
         const newUser = new User({
             username: req.body.username,
             password: hashedPassword,
             role: patientRole._id, // Use the _id of the fetched Role document
             revokedPermissions: [],
+            dateOfBirth: req.body.dateOfBirth,
+            homeAddress: req.body.homeAddress,
+            phoneNumber: req.body.phoneNumber,
         });
 
         // Save the new user
         await newUser.save();
+
+        // Save additional information to PatientRecord notes
+        const patientRecord = new PatientRecord({
+            patient: newUser._id,
+            doctor: null, // You can set the doctor later
+            appointment: null, // You can set the appointment later
+            date: new Date(),
+            healthIssues: [],
+            notes: `Date of Birth: ${req.body.dateOfBirth}, Home Address: ${req.body.homeAddress}, Phone Number: ${req.body.phoneNumber}`,
+        });
+
+        await patientRecord.save();
 
         res.status(200).send("User registered successfully. Please log in.");
     } catch (error) {
@@ -77,6 +93,31 @@ patientRouter.post("/login", async (req, res) => {
     }
 });
 
+// Get all doctors
+patientRouter.get(
+    "/doctors",
+    requirePermission("view_doctors"),
+    async (req, res) => {
+        // Find the 'Doctor' role
+        const doctorRole = await Role.findOne({ name: "Doctor" });
+
+        if (!doctorRole) {
+            return res.status(404).json({ message: "Doctor role not found" });
+        }
+
+        // Find all users with the 'Doctor' role
+        const doctors = await User.find({ role: doctorRole._id }).select(
+            "username"
+        );
+
+        // Convert the doctors to a plain JavaScript object
+        const doctorsPlainObject = doctors.map((doctor) => doctor.toObject());
+
+        // Return the list of doctors
+        res.json(doctorsPlainObject);
+    }
+);
+
 // Book an appointment
 patientRouter.post(
     "/appointments/:doctorId",
@@ -98,6 +139,19 @@ patientRouter.post(
             return res.status(400).json({ error: "Doctor does not exist" });
         }
 
+        // Find or create the patient record
+        let patientRecord = await PatientRecord.findOne({ patient: patientId });
+        if (!patientRecord) {
+            patientRecord = new PatientRecord({
+                patient: patientId,
+                doctors: [],
+                appointments: [],
+                healthIssues: [],
+                notes: "",
+            });
+            await patientRecord.save();
+        }
+
         try {
             const newAppointment = new Appointment({
                 patient: patientId,
@@ -108,6 +162,13 @@ patientRouter.post(
             });
 
             const savedAppointment = await newAppointment.save();
+
+            // Add the doctor's ID and the appointment ID to the patient record
+            patientRecord.doctors.push(doctorId);
+            patientRecord.appointments.push(savedAppointment._id);
+
+            // Save the updated patient record
+            await patientRecord.save();
 
             res.json(savedAppointment);
         } catch (err) {
@@ -229,7 +290,8 @@ patientRouter.delete(
                 });
             }
 
-            await appointment.remove();
+            // Use deleteOne instead of remove
+            await Appointment.deleteOne({ _id: appointmentId });
 
             res.json({ message: "Appointment deleted successfully." });
         } catch (err) {

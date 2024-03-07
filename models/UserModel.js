@@ -5,7 +5,10 @@ const UserSchema = new mongoose.Schema({
     username: String,
     password: String,
     role: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
-    revokedPermissions: [String], // New field
+    revokedPermissions: [String],
+    dateOfBirth: Date,
+    homeAddress: String,
+    phoneNumber: String,
 });
 
 module.exports = mongoose.model("User", UserSchema);

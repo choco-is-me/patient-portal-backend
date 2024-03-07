@@ -8,21 +8,25 @@ const Prescription = require("../models/Prescription");
 
 // Define the GET method to view appointments
 doctorRouter.get(
-    "/appointments/:patientId?",
+    "/appointments",
     requirePermission("view_appointments"),
     async (req, res) => {
         try {
-            let appointments;
-            if (req.params.patientId) {
-                // If a patientId is provided, return appointments for that patient
-                appointments = await Appointment.find({
-                    doctor: req.user._id,
-                    patient: req.params.patientId,
+            // Find all appointments where the doctor is the logged-in user
+            const appointments = await Appointment.find({
+                doctor: req.user._id,
+            })
+                .populate("patient", "username") // populate the patient field with the username from the User model
+                .populate("doctor", "username") // populate the doctor field with the username from the User model
+                .select("date time description status"); // select the necessary fields from the Appointment model
+
+            // If no appointments found for the logged-in doctor, return an error message
+            if (appointments.length === 0) {
+                return res.status(404).json({
+                    message: "No appointments found for this doctor.",
                 });
-            } else {
-                // If no patientId is provided, return all appointments
-                appointments = await Appointment.find({ doctor: req.user._id });
             }
+
             res.json(appointments);
         } catch (err) {
             res.status(500).json({ message: err.message });
@@ -68,7 +72,7 @@ doctorRouter.put(
             const updatedAppointment = await Appointment.findOneAndUpdate(
                 { _id: req.params.appointmentId, doctor: req.user._id },
                 { status: newStatus },
-                { new: true }
+                { new: true, runValidators: true }
             );
             if (!updatedAppointment) {
                 return res
@@ -84,14 +88,25 @@ doctorRouter.put(
 
 // Allow doctor to get all the patient records
 doctorRouter.get(
-    "/patient-records/:patientId",
+    "/patient-records",
     requirePermission("view_patient_records"),
     async (req, res) => {
         try {
-            // Find all patient records for the given patient
+            // Get the doctor's id from the request
+            const doctorId = req.user._id;
+
+            // Find all appointments where the doctor is the current user
+            const appointments = await Appointment.find({ doctor: doctorId });
+
+            // Extract the patient ids from the appointments
+            const patientIds = appointments.map(
+                (appointment) => appointment.patient
+            );
+
+            // Find all patient records where the patient id is in the list of patients who have an appointment with the doctor
             const patientRecords = await PatientRecord.find({
-                patient: req.params.patientId,
-            });
+                patient: { $in: patientIds },
+            }).populate("patient", "username");
 
             // For each patient record, populate the healthIssues field with the corresponding health issue data
             for (let i = 0; i < patientRecords.length; i++) {
@@ -108,9 +123,9 @@ doctorRouter.get(
     }
 );
 
-// Allow doctor to update the medical record
+// Autofill prescription based on health status that the doctor selected
 doctorRouter.put(
-    "/patient-records/:patientRecordId",
+    "/patient-records/:patientRecordId/health-status",
     requirePermission("update_patient_records"),
     async (req, res) => {
         try {
@@ -119,90 +134,148 @@ doctorRouter.put(
                 req.params.patientRecordId
             );
 
-            // Update the patient record with the request body
-            Object.assign(patientRecord, req.body);
+            // Check if the doctor's ID is in the patient record
+            if (!patientRecord.doctors.includes(req.user._id)) {
+                return res.status(403).json({
+                    message:
+                        "You do not have permission to update this record.",
+                });
+            }
+
+            // Get the health status from the request body
+            const healthStatus = req.body.healthStatus;
+
+            // Find the health issue in the HealthIssue collection
+            const healthIssue = await HealthIssue.findOne({
+                healthStatus: healthStatus,
+            });
+
+            if (!healthIssue) {
+                return res.status(400).json({
+                    message: "The provided health status does not exist.",
+                });
+            }
+
+            // Update the healthStatus field with the health status
+            patientRecord.healthStatus = healthStatus;
 
             // Save the updated patient record
             await patientRecord.save();
 
-            res.json(patientRecord);
+            // Return the updated health status and associated medicines
+            return res.json({
+                healthStatus: healthStatus,
+                medicines: healthIssue.medicines,
+            });
         } catch (err) {
             res.status(500).json({ message: err.message });
         }
     }
 );
 
-doctorRouter.get("/health-status", async (req, res) => {
-    const { patientId, healthStatus } = req.query;
+// Add or update a health issue
+doctorRouter.post(
+    "/healthIssue",
+    requirePermission("create_healthIssue"),
+    async (req, res) => {
+        try {
+            const { healthStatus, medicines } = req.body;
 
-    if (!patientId || !healthStatus) {
-        return res.status(400).json({ error: "Missing required parameters" });
-    }
+            // Find the health issue with the given healthStatus
+            let healthIssue = await HealthIssue.findOne({ healthStatus });
 
-    try {
-        const patientRecord = await PatientRecord.findOne({
-            patient: patientId,
-        }).populate("healthIssues");
+            if (healthIssue) {
+                // If the health issue exists, update the medicines
+                healthIssue.medicines = medicines;
+            } else {
+                // If the health issue does not exist, create a new one
+                healthIssue = new HealthIssue({ healthStatus, medicines });
+            }
 
-        const healthIssue = patientRecord.healthIssues.find(
-            (issue) => issue.healthStatus === healthStatus
-        );
+            // Save the health issue
+            await healthIssue.save();
 
-        if (!healthIssue) {
-            return res.status(404).json({ error: "Health issue not found" });
+            res.status(201).json(healthIssue);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: "Internal server error" });
         }
-
-        return res.json({ healthStatus, medicines: healthIssue.medicines });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ error: "Internal server error" });
     }
-});
+);
 
-// Create a new prescription
-doctorRouter.post("/prescription", async (req, res) => {
-    try {
-        const prescription = new Prescription(req.body);
-        await prescription.save();
-        res.status(201).json(prescription);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Internal server error" });
+// Delete a health issue
+doctorRouter.delete(
+    "/healthIssue",
+    requirePermission("delete_healthIssue"),
+    async (req, res) => {
+        try {
+            const { healthStatus } = req.body;
+
+            // Find the health issue with the given healthStatus and delete it
+            const healthIssue = await HealthIssue.findOneAndDelete({
+                healthStatus,
+            });
+
+            if (!healthIssue) {
+                return res
+                    .status(404)
+                    .json({ error: "Health issue not found" });
+            }
+
+            res.status(200).json({
+                message: "Health issue deleted successfully",
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: "Internal server error" });
+        }
     }
-});
+);
 
 // Update an existing prescription
-doctorRouter.put("/prescription/:id", async (req, res) => {
-    try {
-        const prescription = await Prescription.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true }
-        );
-        if (!prescription) {
-            return res.status(404).json({ error: "Prescription not found" });
+doctorRouter.put(
+    "/prescription/:id",
+    requirePermission("update_prescription"),
+    async (req, res) => {
+        try {
+            const prescription = await Prescription.findByIdAndUpdate(
+                req.params.id,
+                req.body,
+                { new: true }
+            );
+            if (!prescription) {
+                return res
+                    .status(404)
+                    .json({ error: "Prescription not found" });
+            }
+            res.json(prescription);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: "Internal server error" });
         }
-        res.json(prescription);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Internal server error" });
     }
-});
+);
 
 // Delete a prescription
-doctorRouter.delete("/prescription/:id", async (req, res) => {
-    try {
-        const prescription = await Prescription.findByIdAndDelete(
-            req.params.id
-        );
-        if (!prescription) {
-            return res.status(404).json({ error: "Prescription not found" });
+doctorRouter.delete(
+    "/prescription/:id",
+    requirePermission("delete_prescription"),
+    async (req, res) => {
+        try {
+            const prescription = await Prescription.findByIdAndDelete(
+                req.params.id
+            );
+            if (!prescription) {
+                return res
+                    .status(404)
+                    .json({ error: "Prescription not found" });
+            }
+            res.json({ message: "Prescription deleted successfully" });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: "Internal server error" });
         }
-        res.json({ message: "Prescription deleted successfully" });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Internal server error" });
     }
-});
+);
 
 module.exports = doctorRouter;
