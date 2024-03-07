@@ -93,6 +93,34 @@ patientRouter.post("/login", async (req, res) => {
     }
 });
 
+// Get the patient's own medical records
+patientRouter.get(
+    "/myRecords",
+    requirePermission("view_own_records"),
+    async (req, res) => {
+        try {
+            // Find the patient's records using the patient's id
+            const records = await PatientRecord.find({ patient: req.user._id });
+
+            // If no records are found, return a 404 status
+            if (!records) {
+                return res.status(404).json({ message: "No records found" });
+            }
+
+            // Convert the records to a plain JavaScript object
+            const recordsPlainObject = records.map((record) =>
+                record.toObject()
+            );
+
+            // Return the patient's records
+            res.json(recordsPlainObject);
+        } catch (error) {
+            // If there's an error, return a 500 status
+            res.status(500).json({ message: "Server error" });
+        }
+    }
+);
+
 // Get all doctors
 patientRouter.get(
     "/doctors",
@@ -102,7 +130,7 @@ patientRouter.get(
         const doctorRole = await Role.findOne({ name: "Doctor" });
 
         if (!doctorRole) {
-            return res.status(404).json({ message: "Doctor role not found" });
+            return res.status(404).json({ message: "No doctor found" });
         }
 
         // Find all users with the 'Doctor' role

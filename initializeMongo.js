@@ -9,6 +9,7 @@ const patientRole = new Role({
     name: "Patient",
     permissions: [
         "view_doctors",
+        "view_own_records",
         "book_appointment",
         "view_appointments",
         "update_appointment",
