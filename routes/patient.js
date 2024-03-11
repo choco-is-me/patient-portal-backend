@@ -107,13 +107,16 @@ patientRouter.get(
                 return res.status(404).json({ message: "No records found" });
             }
 
+            // Find the patient's username using the patient's id
+            const user = await User.findById(req.user._id);
+
             // Convert the records to a plain JavaScript object
             const recordsPlainObject = records.map((record) =>
                 record.toObject()
             );
 
-            // Return the patient's records
-            res.json(recordsPlainObject);
+            // Add the patient's username to the response
+            res.json({ username: user.username, records: recordsPlainObject });
         } catch (error) {
             // If there's an error, return a 500 status
             res.status(500).json({ message: "Server error" });
@@ -226,15 +229,23 @@ patientRouter.get(
         try {
             const appointments = await Appointment.find({
                 patient: patientId,
-            }).populate("doctor");
-            res.json(appointments);
+            })
+                .populate("patient", "username")
+                .populate("doctor", "username");
+
+            // Convert the appointments to a plain JavaScript object
+            const appointmentsPlainObject = appointments.map((appointment) =>
+                appointment.toObject()
+            );
+
+            res.json(appointmentsPlainObject);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
     }
 );
 
-// Update an appointment
+// Update an appointment on Pending status
 patientRouter.put(
     "/appointments/:appointmentId",
     requirePermission("update_appointment"),
@@ -246,7 +257,7 @@ patientRouter.put(
             return res.status(400).json({ error: "Invalid appointmentId." });
         }
 
-        const { date, time, description, status } = req.body;
+        const { date, time, description } = req.body; // Removed status
 
         try {
             const appointment = await Appointment.findById(appointmentId);
@@ -273,7 +284,6 @@ patientRouter.put(
             if (date) appointment.date = date;
             if (time) appointment.time = time;
             if (description) appointment.description = description;
-            if (status) appointment.status = status;
 
             const updatedAppointment = await appointment.save();
 
@@ -284,7 +294,7 @@ patientRouter.put(
     }
 );
 
-// Delete an appointment
+// Cancel an appointment on Pending status
 patientRouter.delete(
     "/appointments/:appointmentId",
     requirePermission("cancel_appointment_on_pending"),

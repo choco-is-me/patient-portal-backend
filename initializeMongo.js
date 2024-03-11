@@ -8,8 +8,8 @@ const HealthIssue = require("./models/HealthIssue");
 const patientRole = new Role({
     name: "Patient",
     permissions: [
-        "view_doctors",
         "view_own_records",
+        "view_doctors",
         "book_appointment",
         "view_appointments",
         "update_appointment",
@@ -25,13 +25,14 @@ const doctorRole = new Role({
         "delete_appointments",
         "change_appointment_status",
         "view_patient_records",
+        "view_healthIssues",
         "update_patient_records",
-        "autofill_prescription",
+        "create_healthIssue",
+        "delete_healthIssue",
+        "view_prescriptions",
         "create_prescription",
         "update_prescription",
         "delete_prescription",
-        "create_healthIssue",
-        "delete_healthIssue",
     ],
 });
 
@@ -117,11 +118,11 @@ const initializeMongo = () => {
 
                 // Update the admin user, or create it if it doesn't exist
                 await User.findOneAndUpdate(
-                    { username: { $in: ["Admin", "Choco"] } }, // Check for both "Admin" and "Choco"
+                    { username: { $in: ["Admin", "Choco"] } }, // Server will check for these usernames so that it won't create a new admin user if it already exists
                     {
                         $set: {
-                            username: "Choco", // User name you want to change to (if you want to change to a new name, you have to add it to the username field right above this line)
-                            password: hashedPassword, // THE PASSWORD IS IN THE .env FILE
+                            username: "Choco", // Current username you want
+                            password: hashedPassword,
                             role: adminRole._id,
                             revokedPermissions: [],
                         },

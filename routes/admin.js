@@ -103,7 +103,24 @@ adminRouter.delete(
     }
 );
 
-// Update role (Promote or demote a user)
+// View all whole role schema
+adminRouter.get(
+    "/access",
+    requirePermission("manage_access"),
+    async (req, res) => {
+        try {
+            // Fetch all roles
+            const roles = await Role.find({}, "name permissions");
+
+            // Return roles
+            res.json(roles);
+        } catch (error) {
+            res.status(500).send(error.message);
+        }
+    }
+);
+
+// Update a user role
 adminRouter.post(
     "/access",
     requirePermission("manage_access"),
@@ -150,17 +167,26 @@ adminRouter.post(
     }
 );
 
-// View all whole role schema
-adminRouter.get(
-    "/access",
+// Restore permission
+adminRouter.post(
+    "/restore",
     requirePermission("manage_access"),
     async (req, res) => {
         try {
-            // Fetch all roles
-            const roles = await Role.find({}, "name permissions");
+            const user = await User.findById(req.body.userId);
+            if (!user) {
+                return res.status(404).send("User not found");
+            }
 
-            // Return roles
-            res.json(roles);
+            const permission = req.body.permission;
+            const index = user.revokedPermissions.indexOf(permission);
+            if (index === -1) {
+                return res.status(400).send("Permission not revoked");
+            }
+
+            user.revokedPermissions.splice(index, 1);
+            await user.save();
+            res.json({ message: "Permission restored successfully" });
         } catch (error) {
             res.status(500).send(error.message);
         }
