@@ -10,6 +10,7 @@ const Appointment = require("../models/Appointment");
 const PatientRecord = require("../models/PatientRecord");
 const Prescription = require("../models/Prescription");
 const requirePermission = require("./permission");
+const createFingerprint = require("./fingerprint");
 
 // Register
 patientRouter.post("/register", async (req, res) => {
@@ -80,12 +81,19 @@ patientRouter.post("/login", async (req, res) => {
                 {
                     id: user._id.toString(), // Include user's _id in the payload
                     username: user.username,
-                    role: user.role._id.toString(),
+                    role: user.role.name.toString(),
                     revokedPermissions: user.revokedPermissions,
+                    fingerprint: createFingerprint(user), // Your function to create a unique fingerprint
                 },
                 secret,
                 { expiresIn: "1h" }
             );
+            // Set the fingerprint in an HTTP-only cookie
+            res.cookie("fingerprint", createFingerprint(user), {
+                httpOnly: true,
+                secure: true,
+                sameSite: "strict",
+            });
             res.status(200).send({ token });
         }
     } catch (error) {

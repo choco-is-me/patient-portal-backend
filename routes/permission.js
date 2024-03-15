@@ -42,7 +42,15 @@ function requirePermission(permission) {
                 return res.status(403).send("Forbidden");
             }
 
-            // If permission exists, proceed to the next middleware function
+            // Check the fingerprint
+            const fingerprintFromToken = decodedToken.fingerprint; // Extract the fingerprint from the token
+            const fingerprintFromCookie = req.cookies.fingerprint; // Extract the fingerprint from the cookie
+            console.log(fingerprintFromToken);
+            console.log(fingerprintFromCookie);
+            if (fingerprintFromToken !== fingerprintFromCookie) {
+                return res.status(403).send("Invalid fingerprint");
+            }
+
             next();
         });
     };

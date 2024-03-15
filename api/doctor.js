@@ -11,7 +11,7 @@ app.use(
             "/",
             "/api/patient/register",
             "/api/patient/login",
-            "/roles",
+            "/refresh-token",
         ],
     })
 );
