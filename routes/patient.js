@@ -76,20 +76,23 @@ patientRouter.post("/login", async (req, res) => {
         } else if (!(await bcrypt.compare(req.body.password, user.password))) {
             res.status(401).send("Incorrect password");
         } else {
-            // On successful login, create JWT
+            // Generate fingerprint once
+            const fingerprint = createFingerprint(user);
+
+            // On successful login, create JWT with the generated fingerprint
             const token = jwt.sign(
                 {
-                    id: user._id.toString(), // Include user's _id in the payload
+                    id: user._id.toString(),
                     username: user.username,
-                    role: user.role.name.toString(),
+                    role: user.role._id.toString(),
                     revokedPermissions: user.revokedPermissions,
-                    fingerprint: createFingerprint(user), // Your function to create a unique fingerprint
+                    fingerprint: fingerprint,
                 },
                 secret,
                 { expiresIn: "1h" }
             );
-            // Set the fingerprint in an HTTP-only cookie
-            res.cookie("fingerprint", createFingerprint(user), {
+            // Set cookie with the same fingerprint
+            res.cookie("fingerprint", fingerprint, {
                 httpOnly: true,
                 secure: true,
                 sameSite: "strict",

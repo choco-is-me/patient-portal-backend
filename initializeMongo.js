@@ -41,7 +41,6 @@ const adminRole = new Role({
     permissions: [
         "manage_users",
         "manage_access",
-        "analyze_data",
         ...doctorRole.permissions,
         ...patientRole.permissions,
     ],

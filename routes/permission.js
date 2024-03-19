@@ -45,12 +45,13 @@ function requirePermission(permission) {
             // Check the fingerprint
             const fingerprintFromToken = decodedToken.fingerprint; // Extract the fingerprint from the token
             const fingerprintFromCookie = req.cookies.fingerprint; // Extract the fingerprint from the cookie
-            console.log(fingerprintFromToken);
-            console.log(fingerprintFromCookie);
+            console.log("Token", fingerprintFromToken);
+            console.log("Cookie", fingerprintFromCookie);
             if (fingerprintFromToken !== fingerprintFromCookie) {
                 return res.status(403).send("Invalid fingerprint");
             }
 
+            // If permission exists, proceed to the next middleware function
             next();
         });
     };
