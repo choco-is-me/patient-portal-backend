@@ -9,16 +9,16 @@ const Prescription = require("../models/Prescription");
 // Define the GET method to view appointments
 doctorRouter.get(
     "/appointments",
-    requirePermission("view_appointments"),
+    requirePermission("view_appointments_for_doctor"),
     async (req, res) => {
         try {
             // Find all appointments where the doctor is the logged-in user
             const appointments = await Appointment.find({
                 doctor: req.user._id,
             })
-                .populate("patient", "username") // populate the patient field with the username from the User model
-                .populate("doctor", "username") // populate the doctor field with the username from the User model
-                .select("date time description status"); // select the necessary fields from the Appointment model
+                .populate("patient", "username")
+                .populate("doctor", "username")
+                .select("date time description status");
 
             // If no appointments found for the logged-in doctor, return an error message
             if (appointments.length === 0) {
@@ -151,6 +151,13 @@ doctorRouter.put(
             const patientRecord = await PatientRecord.findById(
                 req.params.patientRecordId
             );
+
+            // Check if the patient record exists
+            if (!patientRecord) {
+                return res.status(404).json({
+                    message: "Patient record not found.",
+                });
+            }
 
             // Check if the doctor's ID is in the patient record
             if (!patientRecord.doctors.includes(req.user._id)) {

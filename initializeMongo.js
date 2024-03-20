@@ -11,7 +11,7 @@ const patientRole = new Role({
         "view_own_records",
         "view_doctors",
         "book_appointment",
-        "view_appointments",
+        "view_appointments_for_patient",
         "update_appointment",
         "cancel_appointment_on_pending",
         "view_prescription",
@@ -21,7 +21,7 @@ const patientRole = new Role({
 const doctorRole = new Role({
     name: "Doctor",
     permissions: [
-        "view_appointments",
+        "view_appointments_for_doctor",
         "delete_appointments",
         "change_appointment_status",
         "view_patient_records",

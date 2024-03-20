@@ -17,11 +17,14 @@ function requirePermission(permission) {
         jwt.verify(token, secret, async (err, decodedToken) => {
             if (err) {
                 console.log(err);
+                if (err.name === "TokenExpiredError") {
+                    return res.status(403).send("Token is expired");
+                }
                 return res.status(403).send("Invalid token");
             }
 
             // Find the user's role
-            const userRole = await Role.findById(decodedToken.role);
+            const userRole = await Role.findOne({ name: decodedToken.role });
 
             // Find the user
             const user = await User.findById(decodedToken.id);
@@ -30,7 +33,7 @@ function requirePermission(permission) {
 
             // Check if userRole is null
             if (!userRole) {
-                console.log(`Role not found with id: ${decodedToken.role}`);
+                console.log(`Role not found with name: ${decodedToken.role}`);
                 return res.status(500).send("Role not found");
             }
 

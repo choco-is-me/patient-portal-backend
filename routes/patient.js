@@ -84,7 +84,7 @@ patientRouter.post("/login", async (req, res) => {
                 {
                     id: user._id.toString(),
                     username: user.username,
-                    role: user.role._id.toString(),
+                    role: user.role.name, // Changed this line
                     revokedPermissions: user.revokedPermissions,
                     fingerprint: fingerprint,
                 },
@@ -222,7 +222,7 @@ patientRouter.post(
 // Get all appointments of the logged in patient
 patientRouter.get(
     "/appointments",
-    requirePermission("view_appointments"),
+    requirePermission("view_appointments_for_patient"),
     async (req, res) => {
         const patientId = req.user._id; // Get patientId from logged-in user
 

@@ -29,6 +29,12 @@ adminRouter.post(
                 return res.status(400).send("Username already exists");
             }
 
+            // Check if role exists
+            const existingRole = await Role.findById(req.body.role);
+            if (!existingRole) {
+                return res.status(400).send("Role does not exist");
+            }
+
             // Hash the password
             const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
