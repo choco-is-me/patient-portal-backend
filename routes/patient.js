@@ -91,12 +91,22 @@ patientRouter.post("/login", async (req, res) => {
                 secret,
                 { expiresIn: "1h" }
             );
-            // Set cookie with the same fingerprint
-            res.cookie("fingerprint", fingerprint, {
+
+            // Set cookie options based on the environment
+            let cookieOptions = {
                 httpOnly: true,
-                secure: true,
                 sameSite: "strict",
-            });
+                secure: true,
+            };
+
+            if (process.env.NODE_ENV !== "production") {
+                cookieOptions.sameSite = "lax";
+                cookieOptions.secure = false;
+            }
+            console.log(cookieOptions);
+
+            // Set cookie with the same fingerprint
+            res.cookie("fingerprint", fingerprint, cookieOptions);
             res.status(200).send({ token });
         }
     } catch (error) {
